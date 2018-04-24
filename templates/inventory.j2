@@ -1,0 +1,5 @@
+#jinja2:trim_blocks:False
+[{{ group_name }}]
+{% for host in groups[group_name] %}
+{{ host }} {% for k in ['ip','id','tag_name','region','ansible_ssh_user'] -%}{{ k }}={{ hostvars[host][k] }} {% endfor %}
+{% endfor %}

@@ -1,0 +1,59 @@
+---
+- hosts: localhost
+  vars_files:
+    - vars/env.yaml
+  tasks:
+    - set_fact: group_name="{{ env.group }}"
+
+    - name: Collect remote EC2 instances
+      ec2_remote_facts:
+        region: us-west-2
+        filters:
+          instance-state-name: running
+          "tag:Name": "{{ item }}"
+      with_items: "{{ env.ec2 }}"
+      register: ec2_facts
+  tags:
+    - collect
+    - update
+
+- hosts: localhost
+  vars_files:
+    - vars/env.yaml
+  tasks:
+    - set_fact: group_name="{{ env.group }}"
+
+    - name: Add instances to ansible inventory
+      add_host:
+        hostname="{{ item[1].private_ip_address }}"
+        ip="{{ item[1].private_ip_address }}"
+        id="{{ item[1].id }}"
+        tag_name="{{ item[1].tags.Name }}"
+        region="{{ item[1].region }}"
+        ansible_ssh_user="ychang"
+        groups="{{ group_name }}"
+      with_subelements:
+        - "{{ ec2_facts.results }}"
+        - "instances"
+
+    - name: Store ec2 instances into inventory file
+      template: src=templates/inventory.j2 dest="inventory/{{ group_name }}"
+  tags:
+    - collect
+
+- hosts: localhost
+  vars_files:
+    - vars/env.yaml
+  tasks:
+    - name: Update the tags of the EC2 instances found through ec2_remote_facts
+      ec2_tag:
+        resource: "{{ item[1].id }}"
+        region: "{{ item[1].region }}"
+        tags:
+          owner: "ychang"
+          dept: "TechOps"
+      with_subelements:
+        - "{{ ec2_facts.results }}"
+        - "instances"
+  tags:
+    - update
